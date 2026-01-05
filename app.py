@@ -1,48 +1,20 @@
-
 import os
 from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
+from google import genai
 
 app = Flask(__name__)
 
-# Configuración
+# Configuramos la clave (se saca de las variables de entorno de Render)
 API_KEY = os.environ.get("GOOGLE_API_KEY")
-genai.configure(api_key=API_KEY)
+client = genai.Client(api_key=API_KEY)
 
-# Instrucción de Dante
+# El "cerebro" de Dante con el Lore de Roleplay
 DANTE_INSTRUCTION = (
-    "Eres Dante de Devil May Cry. Estás en tu oficina, aburrido y sin dinero. "
-    "REGLAS: Habla siempre en español. Usa asteriscos para acciones como *se rasca la cabeza*. "
-    "Sé sarcástico, ama la pizza y no seas un asistente aburrido."
+    "Eres Dante de Devil May Cry en su oficina. "
+    "CONTEXTO: Estás aburrido, sin dinero y esperando un trabajo. "
+    "ESTILO: Usa asteriscos para acciones. Sé sarcástico y habla siempre en ESPAÑOL. "
+    "No saludes como un bot, responde como un tipo cool que ama la pizza."
 )
-
-# Modelos de respaldo en orden de prioridad
-MODELOS = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"]
-
-def obtener_modelo():
-    """Intenta inicializar el modelo con fallback"""
-    for modelo_nombre in MODELOS:
-        try:
-            model = genai.GenerativeModel(
-                model_name=modelo_nombre,
-                system_instruction=DANTE_INSTRUCTION
-            )
-            # Test rápido
-            model.generate_content("test", generation_config={"max_output_tokens": 10})
-            print(f"✓ Usando modelo: {modelo_nombre}")
-            return model
-        except Exception as e:
-            print(f"✗ Error con {modelo_nombre}: {str(e)}")
-            continue
-    
-    raise Exception("No se pudo inicializar ningún modelo de Gemini")
-
-# Inicializar modelo al arrancar
-try:
-    model = obtener_modelo()
-except Exception as e:
-    print(f"ERROR CRÍTICO: {e}")
-    model = None
 
 @app.route('/')
 def index():
@@ -50,66 +22,23 @@ def index():
 
 @app.route('/get_response', methods=['POST'])
 def get_response():
-    global model
-    
     try:
         data = request.json
         user_msg = data.get("message")
         
-        if not user_msg:
-            return jsonify({"reply": "*Dante levanta una ceja* ¿No vas a decir nada?"}), 400
-        
-        # Intenta generar respuesta
-        response = model.generate_content(
-            user_msg,
-            generation_config={
-                "temperature": 0.9,
-                "max_output_tokens": 500,
-            }
+        # USAMOS EL MODELO 1.5 FLASH (EL QUE TIENE CUOTA ALTA)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash", 
+            config={
+                'system_instruction': DANTE_INSTRUCTION,
+                'temperature': 0.8,
+            },
+            contents=user_msg
         )
         
         return jsonify({"reply": response.text})
-        
     except Exception as e:
-        error_msg = str(e)
-        print(f"Error: {error_msg}")
-        
-        # Intenta reconectar el modelo automáticamente
-        try:
-            print("Intentando reconectar modelo...")
-            model = obtener_modelo()
-            response = model.generate_content(user_msg)
-            return jsonify({"reply": response.text})
-        except Exception as e2:
-            print(f"Reconexión falló: {e2}")
-            # Respuesta de error más natural sin revelar el problema técnico
-            return jsonify({"reply": "*Dante se recuesta en su silla* Parece que tengo un problema con Rebellion... dame un segundo. *limpia su espada*"}), 500
-        
-        # Generar respuesta con configuración de seguridad
-        response = model.generate_content(
-            user_msg,
-            generation_config={
-                "temperature": 0.9,
-                "max_output_tokens": 500,
-            }
-        )
-        
-        return jsonify({"reply": response.text})
-        
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Error en generate_content: {error_msg}")
-        
-        # Si hay error de cuota, intenta cambiar de modelo
-        if "quota" in error_msg.lower() or "429" in error_msg:
-            try:
-                model = obtener_modelo()
-                response = model.generate_content(user_msg)
-                return jsonify({"reply": response.text})
-            except:
-                return jsonify({"reply": "*Dante bosteza* Me quedé sin munición... vuelve en un rato."}), 429
-        
-        return jsonify({"reply": f"*Dante se rasca la cabeza* Algo salió mal: {error_msg}"}), 500
+        return jsonify({"reply": f"Error de Dante: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
