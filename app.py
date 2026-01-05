@@ -6,7 +6,8 @@ from google import genai
 app = Flask(__name__)
 
 # CONFIGURACIÓN: Usando tu API Key
-API_KEY = os.environ.get("GOOGLE_API_KEY", "AIzaSyBDmZqUmmsyCExSmjq11xMQ7nKdgnFRz4s")
+API_KEY = os.environ.get("GOOGLE_API_KEY", "TU_CLAVE_ACA_SOLO_PARA_USO_LOCAL")
+
 client = genai.Client(api_key=API_KEY)
 
 @app.route('/')
@@ -46,6 +47,7 @@ def get_response():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
 
