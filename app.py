@@ -23,7 +23,7 @@ def get_response():
         # Cambiamos a 'gemini-1.5-pro' que tiene rutas de acceso más estables
         # Si este falla, probaremos con 'gemini-1.0-pro'
         response = client.models.generate_content(
-            model="gemini-2.0-flash", 
+            model="gemini-1.5-flash-lates", 
             config={
                 'system_instruction': (
                     "Eres Dante de Devil May Cry. Tu personalidad: sarcástico, relajado, un poco arrogante pero con buen corazón, y fanático de la pizza y las aceitunas. "
@@ -47,6 +47,7 @@ def get_response():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
 
