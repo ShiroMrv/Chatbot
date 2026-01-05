@@ -52,15 +52,38 @@ def index():
 def get_response():
     global model
     
-    if not model:
-        return jsonify({"reply": "*Dante se encoge de hombros* Mi conexión con el poder está fallando... prueba más tarde."}), 503
-    
     try:
         data = request.json
         user_msg = data.get("message")
         
         if not user_msg:
             return jsonify({"reply": "*Dante levanta una ceja* ¿No vas a decir nada?"}), 400
+        
+        # Intenta generar respuesta
+        response = model.generate_content(
+            user_msg,
+            generation_config={
+                "temperature": 0.9,
+                "max_output_tokens": 500,
+            }
+        )
+        
+        return jsonify({"reply": response.text})
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Error: {error_msg}")
+        
+        # Intenta reconectar el modelo automáticamente
+        try:
+            print("Intentando reconectar modelo...")
+            model = obtener_modelo()
+            response = model.generate_content(user_msg)
+            return jsonify({"reply": response.text})
+        except Exception as e2:
+            print(f"Reconexión falló: {e2}")
+            # Respuesta de error más natural sin revelar el problema técnico
+            return jsonify({"reply": "*Dante se recuesta en su silla* Parece que tengo un problema con Rebellion... dame un segundo. *limpia su espada*"}), 500
         
         # Generar respuesta con configuración de seguridad
         response = model.generate_content(
@@ -90,6 +113,7 @@ def get_response():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 
