@@ -1,47 +1,17 @@
 import os
 from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
+from groq import Groq # Cambiamos de Google a Groq
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("GOOGLE_API_KEY")
-genai.configure(api_key=API_KEY)
+# Configurá tu nueva API Key en Render con el nombre GROQ_API_KEY
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 DANTE_INSTRUCTION = (
-    "Eres Dante de Devil May Cry en su oficina. "
-    "CONTEXTO: Estás aburrido, sin dinero y esperando un trabajo. "
-    "ESTILO: Usa asteriscos para acciones. Sé sarcástico y habla siempre en ESPAÑOL. "
-    "No saludes como un bot, responde como un tipo cool que ama la pizza."
+    "Eres Dante de Devil May Cry. Estás en tu oficina, aburrido. "
+    "Responde siempre en español, sé sarcástico, usa asteriscos para acciones. "
+    "No eres un asistente, eres un cazador de demonios perezoso."
 )
-
-# Priorizamos los de cuota alta para que no salte el error rápido
-# Estos nombres están probados para la librería google-generativeai
-MODELOS = [
-    "models/gemini-1.5-flash",     # Nombre con prefijo completo
-    "models/gemini-1.5-flash-001", # Versión específica estable
-    "models/gemini-1.5-flash-002", # Versión más reciente
-    "gemini-pro"                   # El modelo clásico de respaldo
-]
-
-def obtener_modelo(indice=0):
-    """Inicializa un modelo según el índice proporcionado"""
-    if indice >= len(MODELOS):
-        return None
-    
-    try:
-        nombre = MODELOS[indice]
-        m = genai.GenerativeModel(
-            model_name=nombre,
-            system_instruction=DANTE_INSTRUCTION
-        )
-        print(f"✓ Dante usando: {nombre}")
-        return m, indice
-    except Exception as e:
-        print(f"✗ Falló {MODELOS[indice]}: {e}")
-        return obtener_modelo(indice + 1)
-
-# Inicialización inicial
-current_model, current_idx = obtener_modelo()
 
 @app.route('/')
 def index():
@@ -49,36 +19,24 @@ def index():
 
 @app.route('/get_response', methods=['POST'])
 def get_response():
-    global current_model, current_idx
-    
     try:
-        data = request.json
-        user_msg = data.get("message")
+        user_msg = request.json.get("message")
         
-        if not user_msg:
-            return jsonify({"reply": "*Dante levanta una ceja* ¿Vas a decir algo?"}), 400
-        
-        response = current_model.generate_content(
-            user_msg,
-            generation_config={"temperature": 0.8, "max_output_tokens": 500}
+        # Usamos Llama 3.3, que es una bestia y es gratis en Groq
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": DANTE_INSTRUCTION},
+                {"role": "user", "content": user_msg}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.8,
         )
-        return jsonify({"reply": response.text})
         
+        reply = chat_completion.choices[0].message.content
+        return jsonify({"reply": reply})
+    
     except Exception as e:
-        error_msg = str(e)
-        # Si el error es de cuota (429), rotamos al siguiente modelo
-        if "429" in error_msg or "quota" in error_msg.lower():
-            print("--- Cuota agotada, rotando modelo ---")
-            res = obtener_modelo(current_idx + 1)
-            if res:
-                current_model, current_idx = res
-                # Reintentar con el nuevo modelo
-                response = current_model.generate_content(user_msg)
-                return jsonify({"reply": response.text})
-            else:
-                return jsonify({"reply": "*Dante bosteza* Me quedé sin munición y el teléfono está cortado. Vuelve mañana."}), 429
-        
-        return jsonify({"reply": f"*Dante se rasca la cabeza* Algo salió mal: {error_msg[:50]}"}), 500
+        return jsonify({"reply": f"*Dante se queda callado* (Error: {str(e)[:50]})"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
