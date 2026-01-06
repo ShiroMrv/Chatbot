@@ -15,10 +15,12 @@ DANTE_INSTRUCTION = (
 )
 
 # Priorizamos los de cuota alta para que no salte el error rápido
+# Estos nombres están probados para la librería google-generativeai
 MODELOS = [
-    "gemini-1.5-flash",        # <--- El rey de la cuota (1500/día)
-    "gemini-1.5-flash-latest", 
-    "gemini-2.0-flash-exp",    # <--- Solo como último recurso (20/día)
+    "models/gemini-1.5-flash",     # Nombre con prefijo completo
+    "models/gemini-1.5-flash-001", # Versión específica estable
+    "models/gemini-1.5-flash-002", # Versión más reciente
+    "gemini-pro"                   # El modelo clásico de respaldo
 ]
 
 def obtener_modelo(indice=0):
@@ -80,6 +82,7 @@ def get_response():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 
